@@ -1,28 +1,14 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-
 interface ChatActionsProps {
   onClearChat: () => void;
   messagesCount: number;
 }
 
-export const ChatActions: React.FC<ChatActionsProps> = ({
+export function ChatActions({
   onClearChat,
   messagesCount
-}) => {
+}: ChatActionsProps) {
   return (
     <div className="flex gap-2">
-      <Link
-        to="/profile"
-        className="px-3 py-1 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors flex items-center gap-2"
-        title="Manage pet profile"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-        Pet Profile
-      </Link>
-      
       <button
         onClick={() => {
           if (window.confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
@@ -40,4 +26,4 @@ export const ChatActions: React.FC<ChatActionsProps> = ({
       </button>
     </div>
   );
-};
+}

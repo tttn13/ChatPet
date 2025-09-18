@@ -10,9 +10,8 @@ public static class ChatEndpoints
         group.MapPost("/", async (
             ChatRequest request,
             IGroqService groqService,
-            IPetProfileService petProfileService,
             IValidationService validationService,
-            ITelemetryService telemetryService,
+            ITelemetryPetService telemetryService,
             ILogger<Program> logger) =>
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -23,10 +22,9 @@ public static class ChatEndpoints
                 request = new ChatRequest
                 {
                     Message = validationService.SanitizeInput(request.Message),
-                    SessionId = string.IsNullOrEmpty(request.SessionId) ? null : validationService.SanitizeInput(request.SessionId)
+                    SessionId = string.IsNullOrWhiteSpace(request.SessionId) ? null : validationService.SanitizeInput(request.SessionId)
                 };
 
-                // Log the incoming request (without sensitive data)
                 logger.LogInformation("Received chat request: MessageLength={Length}, SessionId='{SessionId}'",
                     request.Message.Length, request.SessionId ?? "null");
 
@@ -37,17 +35,10 @@ public static class ChatEndpoints
                     return Results.BadRequest(new { error = "Message cannot be empty" });
                 }
 
-                // Get pet profile if session exists
-                PetProfile? petProfile = null;
-                if (!string.IsNullOrEmpty(request.SessionId))
-                {
-                    petProfile = await petProfileService.GetProfileAsync(request.SessionId);
-                }
-
                 // Record user request
-                telemetryService.RecordUserRequest(request.SessionId ?? "anonymous", petProfile != null);
+                telemetryService.RecordUserRequest(request.SessionId ?? "anonymous", false);
 
-                var (response, thinking, actualSessionId) = await groqService.GetPetAdviceAsync(request.Message, request.SessionId, petProfile);
+                var (response, thinking, actualSessionId) = await groqService.GetPetAdviceAsync(request.Message, request.SessionId);
 
                 logger.LogInformation("Sending chat response: SessionId='{SessionId}', ResponseLength={ResponseLength}, HasThinking={HasThinking}",
                     actualSessionId, response.Length, thinking != null);

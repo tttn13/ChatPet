@@ -1,0 +1,40 @@
+### Test Cookie-Based Authentication Flow
+
+@baseUrl = https://chatpet-backend.onrender.com
+@contentType = application/json
+
+### 1. Login (Sets HTTP-only cookie)
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "testuser",
+  "password": "testuser123"
+}
+
+### 2. Test Protected Endpoint with Cookie
+# Extract cookie from login response and include it
+GET {{baseUrl}}/api/auth/me
+Cookie: {{login.response.headers.Set-Cookie}}
+
+### 3. Validate Token (using cookie)
+GET {{baseUrl}}/api/auth/validate
+Cookie: {{login.response.headers.Set-Cookie}}
+
+### 4. Test Chat Endpoint with Cookie
+POST {{baseUrl}}/api/chat
+Content-Type: {{contentType}}
+Cookie: {{login.response.headers.Set-Cookie}}
+
+{
+  "petId": "test-pet-001",
+  "message": "What food is good for my cat?"
+}
+
+### 5. Logout (Clears cookie)
+POST {{baseUrl}}/api/auth/logout
+Cookie: {{login.response.headers.Set-Cookie}}
+
+### 6. Try Protected Endpoint After Logout (Should fail)
+GET {{baseUrl}}/api/auth/me

@@ -4,10 +4,11 @@ import { ChatInput } from './ChatInput';
 import { ChatActions } from './ChatActions';
 import { ChatMessage as ChatMessageType, ChatResponse } from '../types/chat';
 import { useChatPersistence } from '../hooks/useChatPersistence';
+import { useAuth } from '../hooks/useAuth';
+import { chatApiService } from '../services/apiService';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5293';
+export function ChatContainer() {
 
-export const ChatContainer: React.FC = () => {
   const {
     messages,
     sessionId,
@@ -15,9 +16,14 @@ export const ChatContainer: React.FC = () => {
     addMessage,
     clearChat
   } = useChatPersistence();
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -27,62 +33,45 @@ export const ChatContainer: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = async (message: string) => {
-    // Add user message
-    const userMessage: ChatMessageType = {
-      id: Date.now().toString(),
+  const createAndPersistMessage = (
+    message: string,
+    response: string,
+    isThinking: string | null,
+    date: Date,
+    isUser: boolean,
+  ) => {
+
+    const createdMessage: ChatMessageType = {
+      id: isUser ? Date.now().toString() : (Date.now() + 1).toString(),
       message,
-      response: '',
-      timestamp: new Date(),
-      isUser: true,
+      response: response,
+      thinking: isThinking,
+      timestamp: date,
+      isUser: isUser,
     };
-    addMessage(userMessage);
+    addMessage(createdMessage);
+  }
+
+  const sendMessage = async (message: string) => {
+
+    createAndPersistMessage(message, "", null, new Date(), true)
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message,
-          sessionId,
-        }),
-      });
+      const data = await chatApiService.fetchResponse(message, sessionId || '')
 
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
-
-      const data: ChatResponse = await response.json();
-      
-      // Update sessionId if not set
       if (!sessionId) {
         setSessionId(data.sessionId);
       }
 
       // Add assistant response
-      const assistantMessage: ChatMessageType = {
-        id: (Date.now() + 1).toString(),
-        message: '',
-        response: data.response,
-        thinking: data.thinking,
-        timestamp: new Date(data.timestamp),
-        isUser: false,
-      };
-      addMessage(assistantMessage);
+      createAndPersistMessage('', data.response, data.thinking, new Date(data.timestamp), false)
+
     } catch (error) {
       console.error('Error sending message:', error);
       // Add error message
-      const errorMessage: ChatMessageType = {
-        id: (Date.now() + 1).toString(),
-        message: '',
-        response: 'Sorry, I encountered an error. Please try again later.',
-        timestamp: new Date(),
-        isUser: false,
-      };
-      addMessage(errorMessage);
+      createAndPersistMessage('', 'Sorry, I encountered an error. Please try again later.', null, new Date(), false)
+
     } finally {
       setIsLoading(false);
     }
@@ -96,10 +85,18 @@ export const ChatContainer: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-800">🐾 Pet Assistant</h1>
             <p className="text-sm text-gray-600">Your virtual veterinary companion</p>
           </div>
-          <ChatActions
-            onClearChat={clearChat}
-            messagesCount={messages.length}
-          />
+          <div className="flex items-center gap-4">
+            <ChatActions
+              onClearChat={clearChat}
+              messagesCount={messages.length}
+            />
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -169,4 +166,4 @@ export const ChatContainer: React.FC = () => {
       <ChatInput onSendMessage={sendMessage} isLoading={isLoading} />
     </div>
   );
-};
+}

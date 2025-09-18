@@ -18,28 +18,3 @@ export interface ChatRequest {
   message: string;
   sessionId?: string;
 }
-
-export interface PetProfile {
-  id: string;
-  name: string;
-  species: string;
-  breed?: string;
-  age?: number;
-  gender?: string;
-}
-
-export interface CreatePetProfileRequest {
-  name: string;
-  species: string;
-  breed?: string;
-  age?: number;
-  gender?: string;
-}
-
-export interface UpdatePetProfileRequest {
-  name?: string;
-  species?: string;
-  breed?: string;
-  age?: number;
-  gender?: string;
-}

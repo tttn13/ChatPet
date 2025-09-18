@@ -1,13 +1,13 @@
 namespace PetAssistant.Services;
 
-public interface IConversationCleanupService
+public interface IConversationCleanupPetService
 {
     void CleanupOldSessions();
     void CleanupSession(string sessionId);
     ConversationStats GetStats();
 }
 
-public class ConversationCleanupService : BackgroundService, IConversationCleanupService
+public class ConversationCleanupService : BackgroundService, IConversationCleanupPetService
 {
     private readonly ILogger<ConversationCleanupService> _logger;
     private readonly IConfiguration _configuration;

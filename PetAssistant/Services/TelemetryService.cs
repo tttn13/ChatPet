@@ -3,7 +3,7 @@ using System.Diagnostics.Metrics;
 
 namespace PetAssistant.Services;
 
-public interface ITelemetryService
+public interface ITelemetryPetService
 {
     void RecordApiCall(string endpoint, TimeSpan duration, bool success);
     void RecordCacheHit(bool hit);
@@ -11,8 +11,10 @@ public interface ITelemetryService
     void RecordUserRequest(string sessionId, bool hasProfile);
     TelemetryStats GetStats();
 }
-
-public class TelemetryService : ITelemetryService, IDisposable
+/// <summary>
+/// monitoring and metrics collection service that tracks various performance and usage metrics for PetAssistant API
+/// </summary>
+public class TelemetryService : ITelemetryPetService, IDisposable
 {
     private readonly ILogger<TelemetryService> _logger;
     private readonly Meter _meter;

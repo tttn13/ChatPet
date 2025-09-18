@@ -7,7 +7,7 @@ interface ChatMessageProps {
   message: ChatMessageType;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export function ChatMessage({ message }: ChatMessageProps) {
   const [showThinking, setShowThinking] = useState(false);
 
   return (
@@ -88,4 +88,4 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       </div>
     </div>
   );
-};
+}

@@ -1,42 +1,41 @@
-import React, { useState, KeyboardEvent } from 'react';
+import React, { useState } from 'react';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   isLoading?: boolean;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false }) => {
+export function ChatInput({ onSendMessage, isLoading = false }: ChatInputProps) {
   const [message, setMessage] = useState('');
 
-  const handleSend = () => {
-    if (message.trim() && !isLoading) {
-      onSendMessage(message.trim());
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmedMessage = message.trim();
+    
+    if (!isNullOrWhitespace(trimmedMessage) && !isLoading) {
+      onSendMessage(trimmedMessage);
       setMessage('');
     }
   };
 
-  const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  const isNullOrWhitespace = (str: string | null | undefined): boolean => {
+    return str === null || str === undefined || str.trim() == '';
+  }
 
   return (
     <div className="border-t border-gray-200 p-4 bg-white">
-      <div className="flex gap-2">
-        <textarea
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input
+          type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
           placeholder="Ask me about your pet's health, behavior, or care..."
-          className="flex-1 resize-none rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          rows={3}
+          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isLoading}
         />
         <button
-          onClick={handleSend}
-          disabled={isLoading || !message.trim()}
+          type="submit"
+          disabled={isLoading || isNullOrWhitespace(message)}
           className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? (
@@ -48,10 +47,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading =
             'Send'
           )}
         </button>
-      </div>
+      </form>
       <div className="text-xs text-gray-500 mt-2">
-        Press Enter to send, Shift+Enter for new line
+        Press Enter to send
       </div>
     </div>
   );
-};
+}

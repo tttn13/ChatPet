@@ -1,166 +1,118 @@
-using System.Text;
-using Newtonsoft.Json;
-using PetAssistant.Models;
-
+using PetAssistant.Services.Redis;
 namespace PetAssistant.Services;
 
 public interface IGroqService
 {
-    Task<(string response, string? thinking, string sessionId)> GetPetAdviceAsync(string userMessage, string? sessionId = null, PetProfile? petProfile = null);
+    Task<(string response, string? thinking, string sessionId)> GetPetAdviceAsync(string userMessage, string? sessionId = null);
 }
 
-public class GroqService : IGroqService
+public class GroqService : BaseService, IGroqService
 {
     private readonly HttpClient _httpClient;
-    private readonly GroqSettings _settings;
-    private readonly ILogger<GroqService> _logger;
+    private readonly IConfiguration _config;
     private readonly IErrorHandlingService _errorHandlingService;
-    private readonly ICacheService _cacheService;
-    private readonly Dictionary<string, List<GroqMessage>> _conversationHistory = new();
+    private readonly IConversationHistoryStorage _conversationStorage;
 
-    public GroqService(HttpClient httpClient, IConfiguration configuration, ILogger<GroqService> logger, IErrorHandlingService errorHandlingService, ICacheService cacheService)
+    public GroqService(HttpClient httpClient, IConfiguration configuration, ILogger<GroqService> logger, IErrorHandlingService errorHandlingService, IConversationHistoryStorage convoStorage)
+        : base(logger)
     {
         _httpClient = httpClient;
-        _logger = logger;
+        _config = configuration;
         _errorHandlingService = errorHandlingService;
-        _cacheService = cacheService;
-        _settings = configuration.GetSection("GroqSettings").Get<GroqSettings>() 
-            ?? throw new InvalidOperationException("GroqSettings not configured");
-        
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_settings.ApiKey}");
+        _conversationStorage = convoStorage;
+        _httpClient.BaseAddress = new Uri(_config["Groq:ApiUrl"]);
+        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config["Groq:ApiKey"]}");
         _httpClient.Timeout = TimeSpan.FromSeconds(30); // Set reasonable timeout
     }
 
-    public async Task<(string response, string? thinking, string sessionId)> GetPetAdviceAsync(string userMessage, string? sessionId = null, PetProfile? petProfile = null)
+    private async Task<ApiResponse> GetGroqResponseAsync(GroqRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync("", request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            var errorResponse = _errorHandlingService.HandleGroqApiError(response.StatusCode, errorContent);
+            LogWarning("Groq API returned error: {StatusCode}", response.StatusCode);
+            return new Error(errorResponse);
+        }
+
+        var groqResponse = await response.Content.ReadFromJsonAsync<GroqResponse>();
+        LogDebug("Groq API response received successfully");
+        return new Success(groqResponse);
+    }
+    
+    public async Task<(string response, string? thinking, string sessionId)> GetPetAdviceAsync(string userMessage, string? sessionId = null)
     {
         try
         {
             sessionId ??= Guid.NewGuid().ToString("N");
 
-            // Check cache for single-message queries (not ongoing conversations)
-            if (!_conversationHistory.ContainsKey(sessionId))
+            // Load conversation history from Redis or initialize new one
+            var conversationHistory = await _conversationStorage.LoadAsync(sessionId);
+            if (conversationHistory == null || conversationHistory.Count == 0)
             {
-                var cachedResponse = await _cacheService.GetCachedResponseAsync(userMessage, petProfile);
-                if (!string.IsNullOrEmpty(cachedResponse))
-                {
-                    _logger.LogInformation("Returning cached response for SessionId='{SessionId}'", sessionId);
-                    return (cachedResponse, null, sessionId);
-                }
-            }
-            
-            if (!_conversationHistory.ContainsKey(sessionId))
-            {
-                var systemPrompt = @"You are a knowledgeable and compassionate virtual veterinary assistant. 
-                        You provide helpful advice about pet health, behavior, nutrition, and general care. 
-                        Always remind users that for serious health concerns, they should consult with a real veterinarian. 
-                        Be friendly, professional, and thorough in your responses.
-                        Focus on common pets like dogs, cats, birds, rabbits, and small animals.
-                        If asked about emergencies, always advise immediate veterinary care.";
-
-                if (petProfile != null)
-                {
-                    systemPrompt += $@"
-
-The user has a pet with the following profile:
-- Name: {petProfile.Name}
-- Species: {petProfile.Species}
-- Breed: {petProfile.Breed ?? "Not specified"}
-- Age: {(petProfile.Age.HasValue ? $"{petProfile.Age} years old" : "Not specified")}
-- Gender: {petProfile.Gender ?? "Not specified"}
-
-Please personalize your responses based on this pet's information when relevant.";
-                }
-
-                _conversationHistory[sessionId] = new List<GroqMessage>
-                {
-                    new GroqMessage 
-                    { 
-                        Role = "system", 
-                        Content = systemPrompt
-                    }
-                };
+                conversationHistory = _conversationStorage.Initialize();
             }
 
-            _conversationHistory[sessionId].Add(new GroqMessage { Role = "user", Content = userMessage });
+            conversationHistory.Add(new GroqMessage { Role = "user", Content = userMessage });
 
             var request = new GroqRequest
             {
-                Model = _settings.Model,
-                Messages = _conversationHistory[sessionId]
+                Model = _config["Groq:Model"],
+                Messages = conversationHistory
             };
 
-            var json = JsonConvert.SerializeObject(request);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            LogInfo("Sending to Groq API: SessionId='{SessionId}', MessageCount={MessageCount}, Model='{Model}'",
+                sessionId, conversationHistory.Count, _config["Groq:Model"]);
 
-            // Log the request being sent to Groq (without sensitive data)
-            _logger.LogInformation("Sending to Groq API: SessionId='{SessionId}', MessageCount={MessageCount}, Model='{Model}'",
-                sessionId, _conversationHistory[sessionId].Count, _settings.Model);
+            var groqResponse = await GetGroqResponseAsync(request);
 
-            var response = await _httpClient.PostAsync(_settings.ApiUrl, content);
-            
-            if (!response.IsSuccessStatusCode)
+            switch (groqResponse)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                var errorResponse = _errorHandlingService.HandleGroqApiError(response.StatusCode, errorContent);
-                return (errorResponse.Message, null, sessionId);
-            }
-
-            var responseContent = await response.Content.ReadAsStringAsync();
-            var groqResponse = JsonConvert.DeserializeObject<GroqResponse>(responseContent);
-
-            if (groqResponse?.Choices?.FirstOrDefault()?.Message?.Content != null)
-            {
-                var fullMessage = groqResponse.Choices.First().Message.Content;
-                string? thinking = null;
-                string assistantResponse = fullMessage;
-
-                // Parse thinking content if this is a thinking model
-                if (_settings.IsThinking)
-                {
-                    var thinkingStart = fullMessage.IndexOf("<think>");
-                    var thinkingEnd = fullMessage.IndexOf("</think>");
-                    
-                    if (thinkingStart >= 0 && thinkingEnd > thinkingStart)
+                case Success success:
+                    var fullMessage = success.Response.Choices.FirstOrDefault()?.Message?.Content;
+                    if (fullMessage == null)
                     {
-                        thinking = fullMessage.Substring(thinkingStart + 7, thinkingEnd - thinkingStart - 7).Trim();
-                        // Remove thinking tags from the response
-                        assistantResponse = fullMessage.Remove(thinkingStart, thinkingEnd - thinkingStart + 8).Trim();
+                        return ("I couldn't find a proper response. Please try rephrasing your question.", null, sessionId);
                     }
-                }
-                
-                _conversationHistory[sessionId].Add(new GroqMessage { Role = "assistant", Content = assistantResponse });
-                
-                // Cache the response for new sessions only (to avoid caching conversation context)
-                if (_conversationHistory[sessionId].Count == 3) // System prompt + user + assistant = 3 total
-                {
-                    await _cacheService.SetCachedResponseAsync(userMessage, petProfile, assistantResponse, thinking);
-                }
-                
-                // Update activity tracking
-                ConversationCleanupService.UpdateSessionActivity(sessionId, _conversationHistory[sessionId].Count);
-                
-                // Cleanup old messages to prevent memory growth
-                if (_conversationHistory[sessionId].Count > 20)
-                {
-                    _conversationHistory[sessionId].RemoveRange(1, 2);
-                }
-                
-                // Check for expired sessions and clean them up
-                var expiredSessions = ConversationCleanupService.GetExpiredSessions(TimeSpan.FromHours(24));
-                foreach (var expiredSession in expiredSessions)
-                {
-                    _conversationHistory.Remove(expiredSession);
-                }
+                    
+                    var (assistantResponse, thinking) = ParseThinkingContent(fullMessage);
 
-                return (assistantResponse, thinking, sessionId);
+                    await _conversationStorage.MaintainAsync(sessionId, conversationHistory, assistantResponse);
+
+                    return (assistantResponse, thinking, sessionId);
+                case Error error:
+                    return (error.Response.Message, null, sessionId);
+            }           
+        }
+            catch (Exception ex)
+            {
+                var errorResponse = _errorHandlingService.HandleGenericError(ex);
+                return (errorResponse.Message, null, sessionId ?? Guid.NewGuid().ToString("N"));
             }
-
-            return ("I couldn't find a proper response. Please try rephrasing your question.", null, sessionId);
-        }
-        catch (Exception ex)
+       
+        return ("An unexpected error occurred.", null, sessionId ?? Guid.NewGuid().ToString("N"));
+    }
+    
+    private (string assistantResponse, string? thinking) ParseThinkingContent(string fullMessage)
+    {
+        string? thinking = null;
+        string assistantResponse = fullMessage;
+        
+        if (bool.Parse(_config["Groq:IsThinking"]))
         {
-            var errorResponse = _errorHandlingService.HandleGenericError(ex);
-            return (errorResponse.Message, null, sessionId ?? Guid.NewGuid().ToString("N"));
+            var thinkingStart = fullMessage.IndexOf("<think>");
+            var thinkingEnd = fullMessage.IndexOf("</think>");
+            
+            if (thinkingStart >= 0 && thinkingEnd > thinkingStart)
+            {
+                thinking = fullMessage.Substring(thinkingStart + 7, thinkingEnd - thinkingStart - 7).Trim();
+                // Remove thinking tags from the response
+                assistantResponse = fullMessage.Remove(thinkingStart, thinkingEnd - thinkingStart + 8).Trim();
+            }
         }
+        
+        return (assistantResponse, thinking);
     }
 }

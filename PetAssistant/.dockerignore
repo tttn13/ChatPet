@@ -1,0 +1,60 @@
+# Ignore build outputs
+bin/
+obj/
+out/
+publish/
+
+# Ignore test results
+TestResults/
+*.trx
+*.coverage
+
+# Ignore user-specific files
+*.user
+*.suo
+*.userosscache
+*.userprefs
+
+# Ignore IDE files
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore Git files
+.git/
+.gitignore
+.gitattributes
+
+# Ignore documentation
+*.md
+!README.md
+
+# Ignore Docker files themselves
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Ignore test files
+*.Tests/
+*.test.js
+*.spec.js
+
+# Ignore environment files (we'll set these via docker-compose or k8s)
+appsettings.Development.json
+appsettings.Local.json
+.env
+.env.*
+
+# Ignore HTTP test files
+*.http
+
+# Ignore logs
+logs/
+*.log

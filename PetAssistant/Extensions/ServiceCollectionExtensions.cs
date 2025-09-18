@@ -1,44 +1,50 @@
 using AspNetCoreRateLimit;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using PetAssistant.HealthChecks;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using PetAssistant.Services;
+using PetAssistant.Services.Auth;
+using PetAssistant.Services.Redis;
+using StackExchange.Redis;
+using System.Security.Claims;
+using System.Text;
 
 namespace PetAssistant.Extensions;
-//This custom class is created to organize our service registration and extends the built in IServiceCollection with custom methods.   
-//Extension methods MUST be in static classes
+// This custom class is created to organize our service registration and extends the built in IServiceCollection with custom methods.
+// Extension methods MUST be defined in static class, have their first param use 'this' modifier
 public static class ServiceCollectionExtensions
 {
     // IServiceCollection is an built-in interface for service container
-    public static IServiceCollection AddPetAssistantServices(this IServiceCollection services)
+    public static IServiceCollection AddPetAssistantServices(this IServiceCollection services) //tells the c# compiler and this is an extension method for the IserviceCollection type
     {
-        // Core Services
-        
-        // HttpClient services - Scoped by default with HttpClientFactory
+
+        // HttpClient services - Scoped 1/request by default with HttpClientFactory
         services.AddHttpClient<IGroqService, GroqService>();
         // for eg, add a separate AddHttpClient registration for each service that needs an HttpClient.
         // Each service gets its own configured instance because of different settings, named clients (the factory tracks each service's http separately),
         // isolation (if 1 service has issues it doesn't affect others)
 
-          //services.AddHttpClient<IGroqService, GroqService>();
-          //services.AddHttpClient<IWeatherService, WeatherService>();
-          //services.AddHttpClient<IPaymentService, PaymentService>();
+        //services.AddHttpClient<IWeatherService, WeatherService>();
+        //services.AddHttpClient<IPaymentService, PaymentService>();
 
-        // User-specific services - Scoped (one per request)
-        services.AddScoped<IPetProfileService, PetProfileService>();
-        
+
         // Stateless utility services - Singleton
         services.AddSingleton<IValidationService, ValidationService>();
         services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
-        
+
         // Shared cache service - Singleton (properly keyed by user/session)
-        services.AddSingleton<ICacheService, CacheService>();
-        
+        services.AddSingleton<IJwtTokenCacheService, JwtTokenCacheService>();
+        services.AddSingleton<IConversationHistoryStorage, ConversationHistoryStorage>();
+
         // Background services - Singleton
-        services.AddSingleton<IConversationCleanupService, ConversationCleanupService>();
+        services.AddSingleton<IConversationCleanupPetService, ConversationCleanupService>();
         services.AddHostedService<ConversationCleanupService>();
-        
+
         // Application-wide telemetry - Singleton
-        services.AddSingleton<ITelemetryService, TelemetryService>();
+        services.AddSingleton<ITelemetryPetService, TelemetryService>();
+
+        // Authentication services
+        services.AddSingleton<IJwtTokenUsageService, JwtTokenService>();
+        services.AddSingleton<IAuthService, AuthenticationService>();
 
         return services;
     }
@@ -52,7 +58,97 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+    public static IServiceCollection AddRedisService(this IServiceCollection services, IConfiguration config)
+    {
+        var redisConfig = config.GetSection("Redis");
 
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+        {
+            ConfigurationOptions configOptions;
+            // var connectionString = redisConfig["ConnectionString"];
+
+            // System.Console.WriteLine($"connectionString for redis is {connectionString}");
+            // // If connection string is provided, use it directly
+            // if (!string.IsNullOrEmpty(connectionString))
+            // {
+            //     Console.WriteLine("Using provided connection string for Redis");
+            //     configOptions = ConfigurationOptions.Parse(connectionString);
+            //     configOptions.AbortOnConnectFail = false;
+            //     Console.WriteLine($"Parsed Redis options - Host: {string.Join(", ", configOptions.EndPoints.Select(e => e.ToString()))}");
+            //     Console.WriteLine($"SSL Enabled: {configOptions.Ssl}, User Present: {!string.IsNullOrEmpty(configOptions.User)}");
+            //     try
+            //     {
+            //         Console.WriteLine("Attempting to connect to Redis...");
+            //         var connection = ConnectionMultiplexer.Connect(configOptions);
+            //         Console.WriteLine($"Redis connection successful: {connection.IsConnected}");
+            //         return connection;
+            //     }
+            //     catch (Exception ex)
+            //     {
+            //         Console.WriteLine($"REDIS CONNECTION ERROR: {ex.Message}");
+            //         Console.WriteLine($"INNER EXCEPTION: {ex.InnerException?.Message}");
+            //         throw; 
+            //     }
+            // }
+
+            // Otherwise build configuration from individual settings
+            Console.WriteLine("Building Redis configuration from individual settings");
+            configOptions = new ConfigurationOptions();
+
+            var host = redisConfig["Host"];
+            var port = redisConfig["Port"];
+            Console.WriteLine($"Redis Host: {host}, Port: {port}");
+
+            if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(port))
+            {
+                Console.WriteLine("WARNING: Redis Host or Port is missing!");
+            }
+
+            configOptions.EndPoints.Add(host, int.Parse(port));
+
+            if (!string.IsNullOrEmpty(redisConfig["User"]))
+            {
+                Console.WriteLine($"Redis User: {redisConfig["User"]}");
+                configOptions.User = redisConfig["User"];
+            }
+
+            if (!string.IsNullOrEmpty(redisConfig["Password"]))
+            {
+                configOptions.Password = redisConfig["Password"];
+                Console.WriteLine("Redis Password is set (not shown for security)");
+            }
+
+            var originalConnectionString = redisConfig["ConnectionString"] ?? "";
+            if (originalConnectionString.StartsWith("rediss://"))
+            {
+                configOptions.Ssl = true;
+                configOptions.SslHost = redisConfig["Host"];
+                Console.WriteLine("SSL enabled for Redis connection");
+            }
+
+            configOptions.AbortOnConnectFail = false; // Allow retries
+            configOptions.ConnectTimeout = int.Parse(redisConfig["ConnectTimeout"] ?? "15000");
+            configOptions.SyncTimeout = int.Parse(redisConfig["SyncTimeout"] ?? "10000");
+            Console.WriteLine($"Redis Connect Timeout: {configOptions.ConnectTimeout}ms, Sync Timeout: {configOptions.SyncTimeout}ms");
+
+            try
+            {
+                Console.WriteLine("Attempting to connect to Redis with built configuration...");
+                var connection = ConnectionMultiplexer.Connect(configOptions);
+                Console.WriteLine($"Redis connection successful: {connection.IsConnected}");
+                return connection;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"REDIS CONNECTION ERROR: {ex.Message}");
+                Console.WriteLine($"INNER EXCEPTION: {ex.InnerException?.Message}");
+                throw; // Re-throw to maintain original behavior
+            }
+        });
+
+        services.AddSingleton<IRedisService, RedisService>();
+        return services;
+    }
     public static IServiceCollection AddCustomCors(this IServiceCollection services, IWebHostEnvironment environment)
     {
         services.AddCors(options =>
@@ -61,9 +157,10 @@ public static class ServiceCollectionExtensions
             {
                 if (environment.IsDevelopment())
                 {
-                    policy.AllowAnyOrigin()
+                    policy.WithOrigins("http://localhost:3000") // Specific origin for credentials
                           .AllowAnyMethod()
-                          .AllowAnyHeader();
+                          .AllowAnyHeader()
+                          .AllowCredentials(); // Enable credentials
                 }
                 else
                 {
@@ -91,32 +188,83 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddCustomHealthChecks(this IServiceCollection services)
+    public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddHealthChecks()
-            // Original health check (implements IHealthCheck directly)
-            .AddCheck<GroqApiHealthCheck>("groq-api-original")
-            
-            // New improved version (uses abstract base class)
-            .AddCheck<ImprovedGroqApiHealthCheck>("groq-api-improved")
-            
-            // Cache health check (uses abstract base class)
-            .AddCheck<CacheHealthCheck>("cache")
-            
-            // Database health check (uses abstract base class)
-            .AddCheck<DatabaseHealthCheck>("database")
-            
-            // Memory check (inline lambda)
-            .AddCheck("memory", () =>
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.RequireHttpsMetadata = false; // Set to true in production
+            options.SaveToken = true;
+            options.TokenValidationParameters = new TokenValidationParameters
             {
-                var gc = GC.GetTotalMemory(false);
-                return gc > 100 * 1024 * 1024 // 100MB threshold
-                    ? HealthCheckResult.Degraded($"High memory usage: {gc / 1024 / 1024}MB")
-                    : HealthCheckResult.Healthy($"Memory usage: {gc / 1024 / 1024}MB");
-            });
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.ASCII.GetBytes(configuration["JwtSettings:SecretKey"] ??
+                    throw new InvalidOperationException("JWT SecretKey is not configured"))),
+                ValidateIssuer = true,
+                ValidIssuer = configuration["JwtSettings:Issuer"],
+                ValidateAudience = true,
+                ValidAudience = configuration["JwtSettings:Audience"],
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(5)
+            };
+
+            // Configure JWT Bearer to also check cookies for token and validate revocation status
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = async context =>
+                {
+                    if (string.IsNullOrEmpty(context.Request.Headers.Authorization))
+                    {
+                        context.Token = context.Request.Cookies["X-Access-Token"];
+                    }
+                    await Task.Yield();
+                },
+                OnTokenValidated = async context =>
+                {
+                    var tokenService = context.HttpContext.RequestServices.GetRequiredService<IJwtTokenCacheService>();
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<JwtBearerHandler>>();
+
+                    try
+                    {
+                        var token = context.Request.Headers.Authorization.ToString().Replace("Bearer ", "");
+                        if (string.IsNullOrEmpty(token))
+                        {
+                            token = context.Request.Cookies["X-Access-Token"];
+                        }
+
+                        logger.LogWarning("JWT Token validated for request: {Token}", token);
+                        // Check if token has been revoked in Redis
+                        var isValid = await tokenService.IsTokenExisted(token);
+
+                        if (!isValid)
+                        {
+                            logger.LogWarning("JWT token has been revoked for user {UserId}",
+                                context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+
+                            context.Fail("The token has been revoked");
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log the error but don't fail authentication if Redis is unavailable
+                        // This ensures the system remains available even if Redis is down
+                        logger.LogError(ex, "Error checking token revocation status. Allowing request to proceed.");
+                    }
+                }
+            };
+        });
+
+        services.AddAuthorization();
 
         return services;
     }
+
 }
 
 // Why Static?

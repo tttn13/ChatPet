@@ -1,0 +1,58 @@
+### Pet Assistant API - Authentication Tests
+### Make sure your API is running on http://localhost:5000 or https://localhost:7001
+
+### 1. Login with valid credentials (Using HTTPS - Render handles SSL termination)
+POST https://chatpet-backend.onrender.com/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "testuser123"
+}
+
+### 2. Login with invalid credentials (should fail)
+POST http://localhost:5293/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "wronguser",
+  "password": "wrongpass"
+}
+
+### 3. Get current user info (replace TOKEN with actual token from login response)
+GET http://localhost:5293/api/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InRlc3R1c2VyIiwibmFtZWlkIjoidGVzdC11c2VyLTAwMSIsImp0aSI6IjI0Y2RjY2NkLTUxMWUtNGEwYS04NmFiLTQzOWIyOGI5OTc2MSIsImlhdCI6MTc1NzYwMDE3NSwibmJmIjoxNzU3NjAwMTc1LCJleHAiOjE3NTc2MDM3NzUsImlzcyI6IlBldEFzc2lzdGFudEFQSSIsImF1ZCI6IlBldEFzc2lzdGFudENsaWVudHMifQ.6IjEwtLVMDRETygTm33Ju6Lk_FW3hvm_XXoOobjR8r8
+
+### 4. Validate token
+GET http://localhost:5293/api/auth/validate
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InRlc3R1c2VyIiwibmFtZWlkIjoidGVzdC11c2VyLTAwMSIsImp0aSI6IjJjZDgwNzFiLWNkYjgtNDVjYy1iNmU2LTVjZTg1NGJjNmE3ZiIsImlhdCI6MTc1NzM1NzkyOSwibmJmIjoxNzU3MzU3OTI5LCJleHAiOjE3NTczNjE1MjksImlzcyI6IlBldEFzc2lzdGFudEFQSSIsImF1ZCI6IlBldEFzc2lzdGFudENsaWVudHMifQ.KdAdJpde_5NAsbXigzYhVV7XqKfMPZjdhq-PuNJCx_4
+
+### 5. Logout (revoke token)
+POST http://localhost:5293/api/auth/logout
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InRlc3R1c2VyIiwibmFtZWlkIjoidGVzdC11c2VyLTAwMSIsImp0aSI6IjNiZGI3NzIwLTAyNzEtNGQ5My04N2VmLTJmMGYxZDQ5MWVmZiIsImlhdCI6MTc1NzE5MTcwNiwibmJmIjoxNzU3MTkxNzA2LCJleHAiOjE3NTcxOTUzMDYsImlzcyI6IlBldEFzc2lzdGFudEFQSSIsImF1ZCI6IlBldEFzc2lzdGFudENsaWVudHMifQ.-Wj56A0uZxyGD-aO9mGlAWO8jid_XFZ48VcMorRpksI
+
+### 6. Try accessing protected endpoint after logout (should fail)
+GET http://localhost:5293/api/auth/me
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### 7. Check Redis Health Status
+GET http://chatpet-backend.onrender.com/api/health/redis
+
+### 8. Test with HTTPS (if using development certificate)
+POST https://localhost:7001/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "testuser123"
+}
+###
+POST http://localhost:5293/api/chat
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InRlc3R1c2VyIiwibmFtZWlkIjoidGVzdC11c2VyLTAwMSIsImp0aSI6IjU2YWQxMzllLTRjNjctNDFlMi05Y2Y2LWU5Nzc3YjczOGE5MyIsImlhdCI6MTc1NzQ1NDYxMiwibmJmIjoxNzU3NDU0NjEyLCJleHAiOjE3NTc0NTgyMTIsImlzcyI6IlBldEFzc2lzdGFudEFQSSIsImF1ZCI6IlBldEFzc2lzdGFudENsaWVudHMifQ.wbyB7yj6mOOW8dCh7KeJZb30cPsgpOdeIIWd5Kp2HKU
+
+{
+  "message": "My cat sleeps all the time. What should I do?",
+  "sessionId": "550e8400-e29b-41d4-a716-446655440000"
+}
+
