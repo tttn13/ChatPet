@@ -12,7 +12,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddPetAssistantServices();
 builder.Services.AddRedisService(builder.Configuration);
 builder.Services.AddRateLimiting(builder.Configuration);
-builder.Services.AddCustomCors(builder.Environment);
+builder.Services.AddCustomCors(builder.Configuration,builder.Environment);
 builder.Services.AddProductionSecurity(builder.Environment);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
@@ -35,6 +35,27 @@ else
 
 // Middleware pipeline (order matters!)
 app.UseIpRateLimiting();
+
+// Add CORS headers to ALL responses
+app.Use(async (context, next) =>
+{
+    // Add CORS headers to every response
+    context.Response.Headers.Add("Access-Control-Allow-Origin", "https://chat-pet-seven.vercel.app");
+    context.Response.Headers.Add("Access-Control-Allow-Credentials", "true");
+
+    if (context.Request.Method == "OPTIONS")
+    {
+        // For preflight requests, add additional headers and return immediately
+        context.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        context.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Cookie");
+        context.Response.Headers.Add("Access-Control-Max-Age", "86400");
+        context.Response.StatusCode = 200;
+        return;
+    }
+
+    await next();
+});
+
 app.UseCors("RestrictedCors");
 app.UseAuthentication();
 app.UseAuthorization();

@@ -149,25 +149,28 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IRedisService, RedisService>();
         return services;
     }
-    public static IServiceCollection AddCustomCors(this IServiceCollection services, IWebHostEnvironment environment)
+    public static IServiceCollection AddCustomCors(this IServiceCollection services, IConfiguration config, IWebHostEnvironment environment)
     {
         services.AddCors(options =>
         {
             options.AddPolicy("RestrictedCors", policy =>
             {
+                string originUrl = config["REACT_APP_URL"];
+                System.Console.WriteLine($"originUrl is {originUrl}");
                 if (environment.IsDevelopment())
                 {
-                    policy.WithOrigins("http://localhost:3000") // Specific origin for credentials
+                    policy.WithOrigins(originUrl) // Specific origin for credentials
                           .AllowAnyMethod()
                           .AllowAnyHeader()
                           .AllowCredentials(); // Enable credentials
                 }
                 else
                 {
-                    policy.WithOrigins("https://yourdomain.com") // Replace with actual domain
+                    policy.WithOrigins(originUrl) // Replace with actual domain
                           .AllowAnyMethod()
-                          .AllowAnyHeader();
+                          .AllowAnyHeader().AllowCredentials();
                 }
+               
             });
         });
 

@@ -29,7 +29,7 @@ Cookie: {{login.response.headers.Set-Cookie}}
 
 {
   "petId": "test-pet-001",
-  "message": "What food is good for my cat?"
+  "message": "What food is good for my dog?"
 }
 
 ### 5. Logout (Clears cookie)

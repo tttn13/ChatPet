@@ -27,7 +27,7 @@ public static class AuthEndpoints
                 {
                     HttpOnly = true,
                     Secure = true,
-                    SameSite = SameSiteMode.Strict,
+                    SameSite = SameSiteMode.None, // Changed from Strict to None for cross-origin
                     Expires = result.ExpiresAt
                 });
                 var hasCookie = context.Request.Cookies.TryGetValue("X-Access-Token", out var cookieToken);
