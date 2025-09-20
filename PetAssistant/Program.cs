@@ -8,7 +8,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Clean service registration using extension methods
 builder.Services.AddPetAssistantServices();
 builder.Services.AddRedisService(builder.Configuration);
 builder.Services.AddRateLimiting(builder.Configuration);
@@ -33,14 +32,20 @@ else
     // app.UseHttpsRedirection();
 }
 
-// Middleware pipeline (order matters!)
-app.UseIpRateLimiting();
-
 // Add CORS headers to ALL responses
 app.Use(async (context, next) =>
 {
-    // Add CORS headers to every response
-    context.Response.Headers.Add("Access-Control-Allow-Origin", "https://chat-pet-seven.vercel.app");
+    var allowedOrigins = new[] {
+        "https://chat-pet-seven.vercel.app",
+        "http://localhost:3000" 
+    };
+
+    var origin = context.Request.Headers["Origin"].FirstOrDefault();
+    if (origin != null && allowedOrigins.Contains(origin))
+    {
+        context.Response.Headers.Add("Access-Control-Allow-Origin", origin);
+    }
+
     context.Response.Headers.Add("Access-Control-Allow-Credentials", "true");
 
     if (context.Request.Method == "OPTIONS")
@@ -56,7 +61,8 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseCors("RestrictedCors");
+app.UseCors("CorsPolicy");
+app.UseIpRateLimiting();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -69,15 +75,11 @@ app.MapGet("/", () => "Pet Assistant API - Your Virtual Veterinary Assistant")
 // API endpoint groups
 var api = app.MapGroup("/api").WithOpenApi(); //automatically includes the endpoint in your Swagger/OpenAPI documentation.
 
-// Chat endpoints
 api.MapGroup("/chat").RequireAuthorization().MapChatEndpoints();
 
-// Pet profile CRUD endpoints - commented out as PetProfileEndpoints.cs was deleted
-// api.MapGroup("/pet-profile").RequireAuthorization().MapPetProfileEndpoints();
 
 api.MapGroup("/auth").MapAuthEndpoints();
 
-// Health and monitoring endpoints (not under /api)
 app.MapHealthEndpoints();
 
 app.Run();

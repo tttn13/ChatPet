@@ -65,33 +65,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IConnectionMultiplexer>(sp =>
         {
             ConfigurationOptions configOptions;
-            // var connectionString = redisConfig["ConnectionString"];
-
-            // System.Console.WriteLine($"connectionString for redis is {connectionString}");
-            // // If connection string is provided, use it directly
-            // if (!string.IsNullOrEmpty(connectionString))
-            // {
-            //     Console.WriteLine("Using provided connection string for Redis");
-            //     configOptions = ConfigurationOptions.Parse(connectionString);
-            //     configOptions.AbortOnConnectFail = false;
-            //     Console.WriteLine($"Parsed Redis options - Host: {string.Join(", ", configOptions.EndPoints.Select(e => e.ToString()))}");
-            //     Console.WriteLine($"SSL Enabled: {configOptions.Ssl}, User Present: {!string.IsNullOrEmpty(configOptions.User)}");
-            //     try
-            //     {
-            //         Console.WriteLine("Attempting to connect to Redis...");
-            //         var connection = ConnectionMultiplexer.Connect(configOptions);
-            //         Console.WriteLine($"Redis connection successful: {connection.IsConnected}");
-            //         return connection;
-            //     }
-            //     catch (Exception ex)
-            //     {
-            //         Console.WriteLine($"REDIS CONNECTION ERROR: {ex.Message}");
-            //         Console.WriteLine($"INNER EXCEPTION: {ex.InnerException?.Message}");
-            //         throw; 
-            //     }
-            // }
-
-            // Otherwise build configuration from individual settings
             Console.WriteLine("Building Redis configuration from individual settings");
             configOptions = new ConfigurationOptions();
 
@@ -153,24 +126,14 @@ public static class ServiceCollectionExtensions
     {
         services.AddCors(options =>
         {
-            options.AddPolicy("RestrictedCors", policy =>
+            options.AddPolicy("CorsPolicy", policy =>
             {
                 string originUrl = config["REACT_APP_URL"];
-                System.Console.WriteLine($"originUrl is {originUrl}");
-                if (environment.IsDevelopment())
-                {
-                    policy.WithOrigins(originUrl) // Specific origin for credentials
-                          .AllowAnyMethod()
-                          .AllowAnyHeader()
-                          .AllowCredentials(); // Enable credentials
-                }
-                else
-                {
-                    policy.WithOrigins(originUrl) // Replace with actual domain
-                          .AllowAnyMethod()
-                          .AllowAnyHeader().AllowCredentials();
-                }
-               
+
+                policy.WithOrigins(originUrl, "http://localhost:3000")
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials();
             });
         });
 

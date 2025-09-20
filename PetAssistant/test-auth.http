@@ -7,7 +7,7 @@ Content-Type: application/json
 
 {
   "username": "testuser",
-  "password": "testuser123"
+  "password": "passwordTest@!"
 }
 
 ### 2. Login with invalid credentials (should fail)
@@ -44,7 +44,7 @@ Content-Type: application/json
 
 {
   "username": "testuser",
-  "password": "testuser123"
+  "password": "passwordTest@!"
 }
 ###
 POST http://localhost:5293/api/chat

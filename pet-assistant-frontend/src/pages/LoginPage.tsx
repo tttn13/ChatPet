@@ -92,7 +92,7 @@ export const LoginPage = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800 font-medium">Test Credentials:</p>
             <p className="text-sm text-blue-700">Username: <code>testuser</code></p>
-            <p className="text-sm text-blue-700">Password: <code>testuser123</code></p>
+            <p className="text-sm text-blue-700">Password: <code>passwordTest@!</code></p>
           </div>
           
           <button

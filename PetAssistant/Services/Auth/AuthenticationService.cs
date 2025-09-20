@@ -22,7 +22,7 @@ public class AuthenticationService : IAuthService
     private static readonly UserInfo _testUser = new(
         Id: "test-user-001",
         Username: "testuser",
-        PasswordHash: BCrypt.Net.BCrypt.HashPassword("testuser123") // Pre-hashed password for testuser123
+        PasswordHash: BCrypt.Net.BCrypt.HashPassword("passwordTest@!") // Pre-hashed password for passwordTest@!
     );
 
     public AuthenticationService(

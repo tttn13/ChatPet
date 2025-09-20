@@ -173,7 +173,7 @@ curl -X GET "https://localhost:7001/api/pet-profile/test-session"
 # First login
 curl -X POST "https://localhost:7001/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"username": "testuser", "password": "testuser123"}'
+  -d '{"username": "testuser", "password": "passwordTest@!"}'
 
 # Use the token from login response
 curl -X GET "https://localhost:7001/api/pet-profile/test-session" \

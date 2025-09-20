@@ -78,7 +78,7 @@ Replace the `SecretKey` value in your `appsettings.json` with your generated key
 For development and testing, a single test user is hardcoded:
 
 - **Username**: `testuser`
-- **Password**: `testuser123`
+- **Password**: `passwordTest@!`
 
 ## API Endpoints
 
@@ -91,7 +91,7 @@ Content-Type: application/json
 
 {
   "username": "testuser",
-  "password": "testuser123"
+  "password": "passwordTest@!"
 }
 ```
 
@@ -219,7 +219,7 @@ curl -X POST "https://localhost:7001/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",
-    "password": "testuser123"
+    "password": "passwordTest@!"
   }'
 ```
 

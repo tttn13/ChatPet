@@ -10,7 +10,7 @@ Content-Type: {{contentType}}
 
 {
   "username": "testuser",
-  "password": "testuser123"
+  "password": "passwordTest@!"
 }
 
 ### 2. Test Protected Endpoint with Cookie
