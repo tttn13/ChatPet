@@ -102,6 +102,12 @@ const authService = {
   loginWithDiscord(): void {
     window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5293'}/api/auth/discord`;
   },
+  /**
+   * Initiate Google OAuth login
+   */
+  loginWithGoogle(): void {
+    window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5293'}/api/auth/google`;
+  },
 };
 
 export default authService;

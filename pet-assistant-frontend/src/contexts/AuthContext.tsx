@@ -7,6 +7,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<LoginResponse>;
   loginViaDiscord: () => Promise<void>;
+  loginViaGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -87,7 +88,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw error;
     }
   };
+ /**
+   * Login user with DIscord
+   */
+  const loginViaGoogle = async (): Promise<void> => {
+    try {
+      authService.loginWithGoogle();
+      
+      const currentUser = await authService.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+      }
 
+    } catch (error) {
+      console.error('Login with Discord failed:', error);
+      throw error;
+    }
+  };
   /**
    * Logout user
    */
@@ -106,6 +124,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     login,
     loginViaDiscord,
+    loginViaGoogle,
     logout,
     checkAuth,
   };
