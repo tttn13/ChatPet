@@ -13,3 +13,4 @@ Authorization: Bearer YOUR_JWT_TOKEN_FROM_DISCORD_LOGIN
 ### 4. Test logout with Discord-generated JWT
 POST https://localhost:7001/api/auth/logout
 Authorization: Bearer YOUR_JWT_TOKEN_FROM_DISCORD_LOGIN
+

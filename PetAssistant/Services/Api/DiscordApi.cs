@@ -5,7 +5,7 @@ namespace PetAssistant.Services;
 
 public interface IDiscordApi
 {
-    Task<DiscordUser?> GetUser(string accessToken);
+    Task<AuthUser?> GetUser(string accessToken);
     Task<string?> ExchangeCodeForToken(string code);
 }
 
@@ -49,14 +49,14 @@ public class DiscordApi : BaseService, IDiscordApi
         
         return tresponse.AccessToken;
     }
-    public async Task<DiscordUser?> GetUser(string accessToken)
+    public async Task<AuthUser?> GetUser(string accessToken)
     {
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
 
         var response = await _httpClient.GetAsync("users/@me");
         if (!response.IsSuccessStatusCode) return null;
 
-        var userResponse = await response.Content.ReadFromJsonAsync<DiscordUser>();
+        var userResponse = await response.Content.ReadFromJsonAsync<AuthUser>();
         Console.WriteLine($"user id is {userResponse.Id}");
 
         return userResponse;

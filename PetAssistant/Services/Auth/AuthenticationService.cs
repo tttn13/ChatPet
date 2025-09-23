@@ -10,7 +10,7 @@ public record UserInfo(string Id, string Username, string PasswordHash);
 public interface IAuthService
 {
     Task<LoginResponse?> LoginAsync(LoginRequest request);
-    Task<LoginResponse?> LoginWithDiscordAsync(DiscordUser discordUser);
+    Task<LoginResponse?> LoginViaOauthAsync(AuthUser authUser, string provider);
     Task LogoutAsync(string jwtId);
 }
 
@@ -91,11 +91,11 @@ public class AuthenticationService : IAuthService
         return BCrypt.Net.BCrypt.Verify(password, _testUser.PasswordHash);
     }
 
-    public async Task<LoginResponse?> LoginWithDiscordAsync(DiscordUser discordUser)
+    public async Task<LoginResponse?> LoginViaOauthAsync(AuthUser authUser, string provider)
     {
         try
         {
-            var userId = $"discord-{discordUser.Id}";
+            var userId = $"{provider}-{authUser.Id}";
 
             // Generate JWT token
             var token = _jwtTokenService.GenerateToken(userId);
@@ -106,13 +106,13 @@ public class AuthenticationService : IAuthService
 
             var expiresAt = DateTime.UtcNow.Add(_jwtTokenService.TokenLifetime);
 
-            _logger.LogInformation("Successful Discord login for user: {Username} (ID: {DiscordId})", discordUser.Username, discordUser.Id);
+            _logger.LogInformation("Successful Oauth login for user: {Username} (ID: {AuthId})", authUser.Username, authUser.Id);
 
-            return new LoginResponse(token, discordUser.Username, expiresAt);
+            return new LoginResponse(token, authUser.Username, expiresAt);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during Discord login process for user: {Username}", discordUser.Username);
+            _logger.LogError(ex, "Error during Oauth login process for user: {Username}", authUser.Username);
             return null;
         }
     }

@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
         // isolation (if 1 service has issues it doesn't affect others)
         services.AddHttpClient<IGroqService, GroqService>();
         services.AddHttpClient<IDiscordApi, DiscordApi>();
+        services.AddHttpClient<IGoogleApi, GoogleApi>();
       
         // Stateless utility services - Singleton
         services.AddSingleton<IValidationService, ValidationService>();

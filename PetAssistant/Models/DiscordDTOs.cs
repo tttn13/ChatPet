@@ -12,7 +12,7 @@ public record DiscordAuthResponse
     public string RefreshToken { get; set; } = string.Empty;
 }
 
-public record DiscordUser
+public record AuthUser
 {
     public string Id { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;
@@ -20,3 +20,11 @@ public record DiscordUser
     public string? Avatar { get; set; }
 }
 
+public record GoogleAuthResponse
+{
+    [JsonPropertyName("access_token")]
+    public string AccessToken { get; set; } = string.Empty;
+
+    [JsonPropertyName("id_token")]
+    public string IdToken { get; set; } = string.Empty;
+}

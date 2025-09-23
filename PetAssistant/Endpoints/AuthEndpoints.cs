@@ -3,6 +3,7 @@ using PetAssistant.Services.Auth;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using PetAssistant.Services;
+using PetAssistant.Models;
 
 namespace PetAssistant.Endpoints;
 
@@ -57,7 +58,6 @@ public static class AuthEndpoints
         .Produces(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/logout", [Authorize] async (
-            ClaimsPrincipal user,
             IAuthService authService,
             IJwtTokenUsageService jwtTokenService,
             HttpContext context,
@@ -94,15 +94,15 @@ public static class AuthEndpoints
         .Produces(StatusCodes.Status401Unauthorized)
         .Produces(StatusCodes.Status500InternalServerError);
 
-        group.MapGet("/me", [Authorize] (ClaimsPrincipal user, HttpContext context) =>
+        group.MapGet("/me", [Authorize] (HttpContext context) =>
         {
-            var username = user.FindFirst(ClaimTypes.Name)?.Value;
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var username = context.User.FindFirst(ClaimTypes.Name)?.Value;
+            var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var hasCookie = context.Request.Cookies.TryGetValue("X-Access-Token", out var cookieToken);
 
             return Results.Ok(new
             {
-                claims = user.Claims.Select(c => new { type = c.Type, value = c.Value }).ToList(),
+                claims = context.User.Claims.Select(c => new { type = c.Type, value = c.Value }).ToList(),
                 username,
                 userId,
                 isAuthenticated = true
@@ -169,7 +169,7 @@ public static class AuthEndpoints
                     return Results.Problem("Failed to retrieve Discord user information", statusCode: 400);
                 }
 
-                var jwtResult = await authService.LoginWithDiscordAsync(discordUser);
+                var jwtResult = await authService.LoginViaOauthAsync(discordUser, "discord");
 
                 context.Response.Cookies.Append("X-Access-Token", jwtResult.Token, new CookieOptions
                 {
@@ -180,7 +180,6 @@ public static class AuthEndpoints
                 });
 
                 var frontendUrl = config["Discord:FrontendRedirectUrl"] ?? "http://localhost:3000";
-                // return Results.Redirect($"{frontendUrl}?login=success&provider=discord");
                 return Results.Redirect($"{frontendUrl}");
             }
             catch (Exception ex)
@@ -193,8 +192,58 @@ public static class AuthEndpoints
         .WithSummary("Handle Discord OAuth callback")
         .WithDescription("Processes the authorization code from Discord and generates JWT token");
 
+        // Google OAuth login
+        group.MapGet("/google", async (HttpContext context, IConfiguration config) =>
+        {
+            var redirectUri = config["Google:RedirectUri"];
+            var clientId = config["Google:ClientId"];
+            var scopes = "openid email profile";
+
+            var authUrl = $"https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id={clientId}&scope={scopes}&redirect_uri={Uri.EscapeDataString(redirectUri)}";
+
+            return Results.Redirect(authUrl);
+        })
+        .WithName("GoogleLogin")
+        .WithSummary("Initiate Google OAuth login")
+        .WithDescription("Redirects to Google OAuth authorization page");
+
+
+        group.MapGet("/google/callback", async (
+            string code,
+            IConfiguration config,
+            IAuthService authService,
+            IGoogleApi googleApi,
+            HttpContext context,
+            ILogger<Program> logger) =>
+        {
+            try
+            {
+                var token = await googleApi.ExchangeCodeForToken(code);
+                var googleUser = await googleApi.GetUser(token.IdToken);
+                var jwtResult = await authService.LoginViaOauthAsync(googleUser, "google");
+
+                context.Response.Cookies.Append("X-Access-Token", jwtResult.Token, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Expires = jwtResult.ExpiresAt
+                });
+                var frontendUrl = config["Discord:FrontendRedirectUrl"] ?? "http://localhost:3000";
+                return Results.Redirect($"{frontendUrl}");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error during Google OAuth callback");
+                return Results.Problem("An error occurred during Google authentication", statusCode: 500);
+            }
+        })
+        .WithName("GoogleCallback")
+        .WithSummary("Handle Google OAuth callback")
+        .WithDescription("Processes the authorization code from Google and generates JWT token");
+
         return group;
     }
 
-  
+
 }
