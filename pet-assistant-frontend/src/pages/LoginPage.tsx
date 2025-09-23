@@ -1,37 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+
 export const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   const { login, loginViaDiscord, isAuthenticated, checkAuth } = useAuth();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const from = (location.state as any)?.from?.pathname || '/';
-
-  // Check for Discord login success
-  useEffect(() => {
-    const loginStatus = searchParams.get('login');
-    const provider = searchParams.get('provider');
-
-    if (loginStatus === 'success' && provider === 'discord') {
-      setSuccessMessage('Successfully logged in with Discord!');
-      // Refresh user data after Discord login
-      checkAuth();
-
-      // Clear the URL parameters after a brief delay
-      setTimeout(() => {
-        window.history.replaceState({}, document.title, '/login');
-      }, 2000);
-    }
-  }, [searchParams, checkAuth]);
 
   if (isAuthenticated) {
     return <Navigate to={from} replace />;
@@ -74,12 +54,6 @@ export const LoginPage = () => {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-              {successMessage}
             </div>
           )}
           

@@ -180,7 +180,8 @@ public static class AuthEndpoints
                 });
 
                 var frontendUrl = config["Discord:FrontendRedirectUrl"] ?? "http://localhost:3000";
-                return Results.Redirect($"{frontendUrl}?login=success&provider=discord");
+                // return Results.Redirect($"{frontendUrl}?login=success&provider=discord");
+                return Results.Redirect($"{frontendUrl}");
             }
             catch (Exception ex)
             {
