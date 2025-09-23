@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using PetAssistant.Services.Auth;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using PetAssistant.Services;
+
 namespace PetAssistant.Endpoints;
 
 public static class AuthEndpoints
@@ -17,7 +19,7 @@ public static class AuthEndpoints
             try
             {
                 var result = await authService.LoginAsync(request);
-                
+
                 if (result == null)
                 {
                     return Results.Unauthorized();
@@ -71,7 +73,7 @@ public static class AuthEndpoints
                 }
 
                 var jwtId = jwtTokenService.GetJwtId(token);
-                
+
                 await authService.LogoutAsync(jwtId);
 
                 context.Response.Cookies.Delete("X-Access-Token");
@@ -127,6 +129,71 @@ public static class AuthEndpoints
         .Produces<object>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized);
 
+        // Discord OAuth login
+        group.MapGet("/discord", async (HttpContext context, IConfiguration config) =>
+        {
+            var redirectUri = config["Discord:RedirectUri"];
+            var clientId = config["Discord:ClientId"];
+            var scopes = "identify email";
+
+            var authUrl = $"https://discord.com/api/oauth2/authorize?response_type=code&client_id={clientId}&scope={scopes}&redirect_uri={Uri.EscapeDataString(redirectUri)}";
+
+            return Results.Redirect(authUrl);
+        })
+        .WithName("DiscordLogin")
+        .WithSummary("Initiate Discord OAuth login")
+        .WithDescription("Redirects to Discord OAuth authorization page");
+
+
+        group.MapGet("/discord/callback", async (
+            string code,
+            IConfiguration config,
+            IAuthService authService,
+            IDiscordApi discordApi,
+            HttpContext context,
+            ILogger<Program> logger) =>
+        {
+            try
+            {
+                var discordToken = await discordApi.ExchangeCodeForToken(code);
+                if (string.IsNullOrWhiteSpace(discordToken))
+                {
+                    logger.LogError("Failed to exchange Discord code for token");
+                    return Results.Problem("Failed to authenticate with Discord", statusCode: 400);
+                }
+
+                var discordUser = await discordApi.GetUser(discordToken);
+                if (discordUser == null)
+                {
+                    logger.LogError("Failed to retrieve Discord user information");
+                    return Results.Problem("Failed to retrieve Discord user information", statusCode: 400);
+                }
+
+                var jwtResult = await authService.LoginWithDiscordAsync(discordUser);
+
+                context.Response.Cookies.Append("X-Access-Token", jwtResult.Token, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Expires = jwtResult.ExpiresAt
+                });
+
+                var frontendUrl = config["Discord:FrontendRedirectUrl"] ?? "http://localhost:3000";
+                return Results.Redirect($"{frontendUrl}?login=success&provider=discord");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error during Discord OAuth callback");
+                return Results.Problem("An error occurred during Discord authentication", statusCode: 500);
+            }
+        })
+        .WithName("DiscordCallback")
+        .WithSummary("Handle Discord OAuth callback")
+        .WithDescription("Processes the authorization code from Discord and generates JWT token");
+
         return group;
     }
+
+  
 }

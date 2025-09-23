@@ -18,15 +18,12 @@ public static class ServiceCollectionExtensions
     {
 
         // HttpClient services - Scoped 1/request by default with HttpClientFactory
-        services.AddHttpClient<IGroqService, GroqService>();
-        // for eg, add a separate AddHttpClient registration for each service that needs an HttpClient.
-        // Each service gets its own configured instance because of different settings, named clients (the factory tracks each service's http separately),
+        //add a separate AddHttpClient registration for each service that needs an HttpClient.
+        //Each service gets its own configured instance because of different settings, named clients (the factory tracks each service's http separately),
         // isolation (if 1 service has issues it doesn't affect others)
-
-        //services.AddHttpClient<IWeatherService, WeatherService>();
-        //services.AddHttpClient<IPaymentService, PaymentService>();
-
-
+        services.AddHttpClient<IGroqService, GroqService>();
+        services.AddHttpClient<IDiscordApi, DiscordApi>();
+      
         // Stateless utility services - Singleton
         services.AddSingleton<IValidationService, ValidationService>();
         services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
@@ -65,31 +62,26 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IConnectionMultiplexer>(sp =>
         {
             ConfigurationOptions configOptions;
-            Console.WriteLine("Building Redis configuration from individual settings");
+
             configOptions = new ConfigurationOptions();
 
             var host = redisConfig["Host"];
             var port = redisConfig["Port"];
-            Console.WriteLine($"Redis Host: {host}, Port: {port}");
-
-            if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(port))
-            {
-                Console.WriteLine("WARNING: Redis Host or Port is missing!");
-            }
 
             configOptions.EndPoints.Add(host, int.Parse(port));
+            configOptions.User = redisConfig["User"];
+            configOptions.Password = redisConfig["Password"];
+            // if (!string.IsNullOrEmpty(redisConfig["User"]))
+            // {
+            //     Console.WriteLine($"Redis User: {redisConfig["User"]}");
+            //     configOptions.User = redisConfig["User"];
+            // }
 
-            if (!string.IsNullOrEmpty(redisConfig["User"]))
-            {
-                Console.WriteLine($"Redis User: {redisConfig["User"]}");
-                configOptions.User = redisConfig["User"];
-            }
-
-            if (!string.IsNullOrEmpty(redisConfig["Password"]))
-            {
-                configOptions.Password = redisConfig["Password"];
-                Console.WriteLine("Redis Password is set (not shown for security)");
-            }
+            // if (!string.IsNullOrEmpty(redisConfig["Password"]))
+            // {
+            //     configOptions.Password = redisConfig["Password"];
+            //     Console.WriteLine("Redis Password is set (not shown for security)");
+            // }
 
             var originalConnectionString = redisConfig["ConnectionString"] ?? "";
             if (originalConnectionString.StartsWith("rediss://"))
@@ -106,16 +98,14 @@ public static class ServiceCollectionExtensions
 
             try
             {
-                Console.WriteLine("Attempting to connect to Redis with built configuration...");
                 var connection = ConnectionMultiplexer.Connect(configOptions);
-                Console.WriteLine($"Redis connection successful: {connection.IsConnected}");
                 return connection;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"REDIS CONNECTION ERROR: {ex.Message}");
                 Console.WriteLine($"INNER EXCEPTION: {ex.InnerException?.Message}");
-                throw; // Re-throw to maintain original behavior
+                throw; 
             }
         });
 
@@ -227,6 +217,21 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddAuthorization();
+
+        return services;
+    }
+
+    public static IServiceCollection AddDiscordAuthentication(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddAuthentication()
+            .AddDiscord(options =>
+            {
+                options.ClientId = configuration["Discord:ClientId"] ?? throw new InvalidOperationException("Discord ClientId is not configured");
+                options.ClientSecret = configuration["Discord:ClientSecret"] ?? throw new InvalidOperationException("Discord ClientSecret is not configured");
+                options.CallbackPath = "/api/auth/discord/callback";
+                options.Scope.Add("identify");
+                options.Scope.Add("email");
+            });
 
         return services;
     }

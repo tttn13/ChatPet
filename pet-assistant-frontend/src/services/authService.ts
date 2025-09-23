@@ -64,7 +64,7 @@ const authService = {
    */
   async getCurrentUser(): Promise<User | null> {
     try {
-      // Just try to call the endpoint - cookie will be sent automatically
+      //cookie will be sent automatically
       const response = await apiClient.get<User>('/api/auth/me');
       return response.data;
     } catch (error) {
@@ -94,7 +94,14 @@ const authService = {
    */
   async isAuthenticated(): Promise<boolean> {
     return await this.validateToken();
-  }
+  },
+
+  /**
+   * Initiate Discord OAuth login
+   */
+  loginWithDiscord(): void {
+    window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:5293'}/api/auth/discord`;
+  },
 };
 
 export default authService;

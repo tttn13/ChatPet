@@ -1,4 +1,5 @@
-using PetAssistant.Services.Redis; 
+using PetAssistant.Services.Redis;
+using PetAssistant.Models;
 
 namespace PetAssistant.Services.Auth;
 
@@ -9,6 +10,7 @@ public record UserInfo(string Id, string Username, string PasswordHash);
 public interface IAuthService
 {
     Task<LoginResponse?> LoginAsync(LoginRequest request);
+    Task<LoginResponse?> LoginWithDiscordAsync(DiscordUser discordUser);
     Task LogoutAsync(string jwtId);
 }
 
@@ -39,7 +41,6 @@ public class AuthenticationService : IAuthService
     {
         try
         {
-            // Validate credentials against hardcoded user
             if (!ValidateCredentials(request.Username, request.Password))
             {
                 _logger.LogWarning("Failed login attempt for username: {Username}", request.Username);
@@ -84,11 +85,36 @@ public class AuthenticationService : IAuthService
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             return false;
 
-        // Check against hardcoded test user
         if (!string.Equals(username, _testUser.Username, StringComparison.OrdinalIgnoreCase))
             return false;
 
         return BCrypt.Net.BCrypt.Verify(password, _testUser.PasswordHash);
+    }
+
+    public async Task<LoginResponse?> LoginWithDiscordAsync(DiscordUser discordUser)
+    {
+        try
+        {
+            var userId = $"discord-{discordUser.Id}";
+
+            // Generate JWT token
+            var token = _jwtTokenService.GenerateToken(userId);
+            var jwtId = _jwtTokenService.GetJwtId(token);
+
+            // Store token in Redis
+            await _tokenStorageService.CacheTokenAsync(jwtId, userId, _jwtTokenService.TokenLifetime);
+
+            var expiresAt = DateTime.UtcNow.Add(_jwtTokenService.TokenLifetime);
+
+            _logger.LogInformation("Successful Discord login for user: {Username} (ID: {DiscordId})", discordUser.Username, discordUser.Id);
+
+            return new LoginResponse(token, discordUser.Username, expiresAt);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during Discord login process for user: {Username}", discordUser.Username);
+            return null;
+        }
     }
 
 }

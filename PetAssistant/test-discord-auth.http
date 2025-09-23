@@ -1,0 +1,15 @@
+### Test Discord OAuth Flow
+
+### 1. Initiate Discord OAuth Login
+GET https://localhost:7001/api/auth/discord
+
+### 2. Test Discord Callback (requires actual authorization code from Discord)
+GET https://localhost:7001/api/auth/discord/callback?code=AUTHORIZATION_CODE_FROM_DISCORD
+
+### 3. Test protected endpoint with Discord-generated JWT
+GET https://localhost:7001/api/auth/me
+Authorization: Bearer YOUR_JWT_TOKEN_FROM_DISCORD_LOGIN
+
+### 4. Test logout with Discord-generated JWT
+POST https://localhost:7001/api/auth/logout
+Authorization: Bearer YOUR_JWT_TOKEN_FROM_DISCORD_LOGIN

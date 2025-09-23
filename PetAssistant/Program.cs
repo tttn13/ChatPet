@@ -37,7 +37,8 @@ app.Use(async (context, next) =>
 {
     var allowedOrigins = new[] {
         "https://chat-pet-seven.vercel.app",
-        "http://localhost:3000" 
+        "http://localhost:3000",
+        "https://discord.com"
     };
 
     var origin = context.Request.Headers["Origin"].FirstOrDefault();

@@ -6,6 +6,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<LoginResponse>;
+  loginViaDiscord: () => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -21,7 +22,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check authentication status on mount
   useEffect(() => {
     checkAuth();
   }, []);
@@ -32,7 +32,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuth = async () => {
     setIsLoading(true);
     try {
-      // Validate token with server and get user info
       const currentUser = await authService.getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
@@ -71,6 +70,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   /**
+   * Login user with DIscord
+   */
+  const loginViaDiscord = async (): Promise<void> => {
+    try {
+      authService.loginWithDiscord();
+      
+      const currentUser = await authService.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+      }
+
+    } catch (error) {
+      console.error('Login with Discord failed:', error);
+      throw error;
+    }
+  };
+
+  /**
    * Logout user
    */
   const logout = async () => {
@@ -87,6 +105,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     isLoading,
     login,
+    loginViaDiscord,
     logout,
     checkAuth,
   };
