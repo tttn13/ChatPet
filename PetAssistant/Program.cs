@@ -35,12 +35,10 @@ else
 // Add CORS headers to ALL responses
 app.Use(async (context, next) =>
 {
-    var allowedOrigins = new[] {
-        "https://chat-pet-seven.vercel.app",
-        "http://localhost:3000",
-        "https://discord.com"
-    };
-
+    var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+    
     var origin = context.Request.Headers["Origin"].FirstOrDefault();
     if (origin != null && allowedOrigins.Contains(origin))
     {

@@ -179,7 +179,7 @@ public static class AuthEndpoints
                     Expires = jwtResult.ExpiresAt
                 });
 
-                var frontendUrl = config["Discord:FrontendRedirectUrl"] ?? "http://localhost:3000";
+                var frontendUrl = config["REACT_APP_URL"] ?? "http://localhost:3000";
                 return Results.Redirect($"{frontendUrl}");
             }
             catch (Exception ex)
@@ -229,7 +229,7 @@ public static class AuthEndpoints
                     SameSite = SameSiteMode.None,
                     Expires = jwtResult.ExpiresAt
                 });
-                var frontendUrl = config["Discord:FrontendRedirectUrl"] ?? "http://localhost:3000";
+                var frontendUrl = config["REACT_APP_URL"] ?? "http://localhost:3000";
                 return Results.Redirect($"{frontendUrl}");
             }
             catch (Exception ex)
