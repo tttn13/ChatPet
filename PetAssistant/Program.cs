@@ -1,6 +1,7 @@
 using AspNetCoreRateLimit;
 using PetAssistant.Endpoints;
 using PetAssistant.Extensions;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,10 @@ builder.Services.AddRateLimiting(builder.Configuration);
 builder.Services.AddCustomCors(builder.Configuration,builder.Environment);
 builder.Services.AddProductionSecurity(builder.Environment);
 builder.Services.AddJwtAuthentication(builder.Configuration);
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
 
 
 // ===== Build Application =====

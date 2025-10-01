@@ -31,10 +31,10 @@ public static class AuthEndpoints
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.None, // Changed from Strict to None for cross-origin
+                    // Domain = ".zulon.org",
                     Expires = result.ExpiresAt
                 });
                 var hasCookie = context.Request.Cookies.TryGetValue("X-Access-Token", out var cookieToken);
-
                 return Results.Ok(new
                 {
                     usesCookie = hasCookie,
@@ -94,12 +94,12 @@ public static class AuthEndpoints
         .Produces(StatusCodes.Status401Unauthorized)
         .Produces(StatusCodes.Status500InternalServerError);
 
-        group.MapGet("/me", [Authorize] (HttpContext context) =>
+        group.MapGet("/me", [Authorize] (HttpContext context, ILogger<Program> logger) =>
         {
             var username = context.User.FindFirst(ClaimTypes.Name)?.Value;
             var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var hasCookie = context.Request.Cookies.TryGetValue("X-Access-Token", out var cookieToken);
-
+            
             return Results.Ok(new
             {
                 claims = context.User.Claims.Select(c => new { type = c.Type, value = c.Value }).ToList(),
@@ -169,16 +169,18 @@ public static class AuthEndpoints
                     return Results.Problem("Failed to retrieve Discord user information", statusCode: 400);
                 }
 
+                
                 var jwtResult = await authService.LoginViaOauthAsync(discordUser, "discord");
-
                 context.Response.Cookies.Append("X-Access-Token", jwtResult.Token, new CookieOptions
                 {
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.None,
+                    // Domain = ".zulon.org",
+                    Path = "/",
                     Expires = jwtResult.ExpiresAt
                 });
-
+                var hasCookie = context.Request.Cookies.TryGetValue("X-Access-Token", out var cookieToken);
                 var frontendUrl = config["REACT_APP_URL"] ?? "http://localhost:3000";
                 return Results.Redirect($"{frontendUrl}");
             }
@@ -227,6 +229,7 @@ public static class AuthEndpoints
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.None,
+                    // Domain = ".zulon.org",
                     Expires = jwtResult.ExpiresAt
                 });
                 var frontendUrl = config["REACT_APP_URL"] ?? "http://localhost:3000";

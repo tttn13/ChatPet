@@ -72,18 +72,7 @@ public static class ServiceCollectionExtensions
             configOptions.EndPoints.Add(host, int.Parse(port));
             configOptions.User = redisConfig["User"];
             configOptions.Password = redisConfig["Password"];
-            // if (!string.IsNullOrEmpty(redisConfig["User"]))
-            // {
-            //     Console.WriteLine($"Redis User: {redisConfig["User"]}");
-            //     configOptions.User = redisConfig["User"];
-            // }
-
-            // if (!string.IsNullOrEmpty(redisConfig["Password"]))
-            // {
-            //     configOptions.Password = redisConfig["Password"];
-            //     Console.WriteLine("Redis Password is set (not shown for security)");
-            // }
-
+       
             var originalConnectionString = redisConfig["ConnectionString"] ?? "";
             if (originalConnectionString.StartsWith("rediss://"))
             {
@@ -121,7 +110,7 @@ public static class ServiceCollectionExtensions
             {
                 string originUrl = config["REACT_APP_URL"];
 
-                policy.WithOrigins(originUrl, "http://localhost:3000")
+                policy.WithOrigins(originUrl, "http://localhost:3000", "https://chatpet.zulon.org")
                     .AllowAnyMethod()
                     .AllowAnyHeader()
                     .AllowCredentials();
@@ -133,14 +122,14 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddProductionSecurity(this IServiceCollection services, IWebHostEnvironment environment)
     {
-        if (!environment.IsDevelopment())
-        {
-            services.AddHttpsRedirection(options =>
-            {
-                options.RedirectStatusCode = StatusCodes.Status301MovedPermanently;
-                options.HttpsPort = 443;
-            });
-        }
+        // if (!environment.IsDevelopment())
+        // {
+        //     services.AddHttpsRedirection(options =>
+        //     {
+        //         options.RedirectStatusCode = StatusCodes.Status301MovedPermanently;
+        //         options.HttpsPort = 443;
+        //     });
+        // }
 
         return services;
     }
@@ -178,6 +167,8 @@ public static class ServiceCollectionExtensions
                     if (string.IsNullOrEmpty(context.Request.Headers.Authorization))
                     {
                         context.Token = context.Request.Cookies["X-Access-Token"];
+                        System.Console.WriteLine($"Cookie found in request: {!string.IsNullOrEmpty(context.Token)}");
+
                     }
                     await Task.Yield();
                 },
@@ -218,21 +209,6 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddAuthorization();
-
-        return services;
-    }
-
-    public static IServiceCollection AddDiscordAuthentication(this IServiceCollection services, IConfiguration configuration)
-    {
-        services.AddAuthentication()
-            .AddDiscord(options =>
-            {
-                options.ClientId = configuration["Discord:ClientId"] ?? throw new InvalidOperationException("Discord ClientId is not configured");
-                options.ClientSecret = configuration["Discord:ClientSecret"] ?? throw new InvalidOperationException("Discord ClientSecret is not configured");
-                options.CallbackPath = "/api/auth/discord/callback";
-                options.Scope.Add("identify");
-                options.Scope.Add("email");
-            });
 
         return services;
     }
